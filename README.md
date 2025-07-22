@@ -2,6 +2,12 @@
 
 Ce projet vous permet de télécharger et analyser la liste des députés de l'Assemblée nationale française depuis plusieurs sources de données ouvertes.
 
+## ⚡ Status des scripts (Juillet 2025)
+- ✅ `simple_deputes_script.py` : **Fonctionnel** (618 députés + 586 avec stats)
+- ✅ `deputes_downloader.py` : **Fonctionnel** (multi-sources, logging détaillé)
+- ⚠️ `deputes_analysis_example.py` : **À vérifier** (dépend des données téléchargées)
+- 📝 CSV endpoints NosDéputés temporairement vides → scripts automatiquement basculés sur JSON
+
 ## 🚀 Installation rapide
 
 ```bash
@@ -17,19 +23,19 @@ python simple_deputes_script.py
 
 ### 1. **NosDéputés.fr** (Recommandé)
 - **Source**: Regards Citoyens
-- **URL**: `https://www.nosdeputes.fr/deputes/enmandat/csv`
+- **URL**: `https://www.nosdeputes.fr/deputes/json` (CSV endpoint actuellement vide)
 - **Avantages**: Données complètes, bien structurées, régulièrement mises à jour
-- **Formats**: CSV, JSON, XML
+- **Formats**: JSON (recommandé), XML
 
-### 2. **Datan** (Données enrichies)
-- **Source**: Data.gouv.fr
-- **URL**: Données avec statistiques (participation, loyauté, etc.)
-- **Avantages**: Scores calculés, analyses statistiques
+### 2. **Données enrichies NosDéputés**
+- **Source**: NosDéputés.fr/synthese
+- **URL**: `https://www.nosdeputes.fr/synthese/data/json`
+- **Avantages**: Scores calculés, analyses statistiques (alternative à Datan)
 
 ### 3. **Assemblée nationale officielle**
 - **Source**: data.assemblee-nationale.fr
 - **Avantages**: Source officielle gouvernementale
-- **Inconvénients**: Structure parfois complexe
+- **Statut**: URLs officielles temporairement indisponibles (utilise NosDéputés comme alternative)
 
 ## 📋 Scripts disponibles
 
@@ -38,7 +44,7 @@ python simple_deputes_script.py
 # Téléchargement rapide en une ligne
 python simple_deputes_script.py
 ```
-**Sortie**: `deputes_france.csv` et `deputes_statistiques.csv`
+**Sortie**: `deputes_france.csv` (618 députés) et `deputes_statistiques.csv` (586 députés avec stats)
 
 ### 🔹 Script complet (`deputes_downloader.py`)
 ```python
@@ -46,10 +52,10 @@ python simple_deputes_script.py
 python deputes_downloader.py
 ```
 **Fonctionnalités**:
-- Téléchargement multi-sources
-- Comparaison des datasets
-- Dataset unifié
-- Gestion d'erreurs avancée
+- Téléchargement multi-sources (618 députés depuis 4 sources)
+- Comparaison des datasets avec logging détaillé
+- Dataset unifié dans `data_deputes/`
+- Gestion d'erreurs avancée et URLs de secours
 
 ### 🔹 Script d'analyse (`deputes_analysis_example.py`)
 ```python
@@ -67,11 +73,20 @@ python deputes_analysis_example.py
 ### Téléchargement basique
 ```python
 import pandas as pd
+import requests
 
-# Télécharger directement depuis NosDéputés.fr
-url = "https://www.nosdeputes.fr/deputes/enmandat/csv"
-df = pd.read_csv(url, sep=';', encoding='utf-8')
+# Télécharger directement depuis NosDéputés.fr (JSON)
+url = "https://www.nosdeputes.fr/deputes/json"
+response = requests.get(url)
+data = response.json()
 
+# Convertir en DataFrame
+deputes_data = []
+for depute_info in data['deputes']:
+    depute = depute_info['depute']
+    deputes_data.append(depute)
+
+df = pd.DataFrame(deputes_data)
 print(f"Nombre de députés: {len(df)}")
 print(df.head())
 ```
@@ -157,9 +172,9 @@ except Exception as e:
 ## 🤝 APIs complémentaires
 
 ### NosDéputés.fr API
-- **Liste complète**: `https://www.nosdeputes.fr/deputes/enmandat/json`
+- **Liste complète**: `https://www.nosdeputes.fr/deputes/json` (618 députés)
 - **Député individuel**: `https://www.nosdeputes.fr/{slug}/json`
-- **Synthèse**: `https://www.nosdeputes.fr/synthese/data/json`
+- **Synthèse enrichie**: `https://www.nosdeputes.fr/synthese/data/json` (586 avec stats)
 
 ### Recherche avancée
 ```python
@@ -181,16 +196,18 @@ Données issues de NosDéputés.fr par Regards Citoyens
 
 ## 🆘 Résolution de problèmes
 
-### Erreur d'encodage
+### CSV endpoint vide
 ```python
-# Essayer différents encodages
-encodings = ['utf-8', 'utf-8-sig', 'latin1', 'cp1252']
-for enc in encodings:
-    try:
-        df = pd.read_csv(url, encoding=enc, sep=';')
-        break
-    except UnicodeDecodeError:
-        continue
+# Si le CSV est vide, utiliser le JSON
+try:
+    df = pd.read_csv(url, sep=';', encoding='utf-8')
+except pd.errors.EmptyDataError:
+    # Alternative JSON
+    import requests
+    response = requests.get("https://www.nosdeputes.fr/deputes/json")
+    data = response.json()
+    deputes_data = [d['depute'] for d in data['deputes']]
+    df = pd.DataFrame(deputes_data)
 ```
 
 ### Timeout de téléchargement
